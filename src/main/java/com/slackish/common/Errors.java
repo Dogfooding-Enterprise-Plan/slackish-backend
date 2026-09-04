@@ -1,0 +1,12 @@
+package com.slackish.common;
+
+import org.springframework.http.HttpStatus;
+
+public final class Errors {
+    private Errors() {}
+    public static ApiException unauthorized(String m) { return new ApiException(HttpStatus.UNAUTHORIZED, m); }
+    public static ApiException forbidden(String m) { return new ApiException(HttpStatus.FORBIDDEN, m); }
+    public static ApiException notFound(String m) { return new ApiException(HttpStatus.NOT_FOUND, m); }
+    public static ApiException badRequest(String m) { return new ApiException(HttpStatus.BAD_REQUEST, m); }
+    public static ApiException conflict(String m) { return new ApiException(HttpStatus.CONFLICT, m); }
+}
