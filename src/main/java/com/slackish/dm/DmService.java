@@ -28,20 +28,22 @@ public class DmService {
         return conversations.save(c);
     }
 
-    public DmConversation get(Long conversationId) {
-        return conversations.findById(conversationId)
+    public DmConversation get(Long conversationId, Long userId) {
+        DmConversation c = conversations.findById(conversationId)
                 .orElseThrow(() -> Errors.notFound("Conversation not found"));
+        if (userId == null || (!c.getUserAId().equals(userId) && !c.getUserBId().equals(userId))) {
+            throw Errors.forbidden("Not a participant in this conversation");
+        }
+        return c;
     }
 
-    public List<DmMessage> messages(Long conversationId) {
+    public List<DmMessage> messages(Long conversationId, Long userId) {
+        get(conversationId, userId);
         return dmMessages.findByConversationIdOrderByCreatedAtAsc(conversationId);
     }
 
     public DmMessage send(Long conversationId, Long senderId, String body) {
-        DmConversation c = get(conversationId);
-        if (!c.getUserAId().equals(senderId) && !c.getUserBId().equals(senderId)) {
-            throw Errors.forbidden("Not a participant in this conversation");
-        }
+        get(conversationId, senderId);
         DmMessage m = new DmMessage();
         m.setConversationId(conversationId);
         m.setSenderId(senderId);
