@@ -1,6 +1,8 @@
 package com.slackish.invitation;
 
 import com.slackish.common.Errors;
+import com.slackish.user.User;
+import com.slackish.user.UserRepository;
 import com.slackish.workspace.Membership;
 import com.slackish.workspace.MembershipRepository;
 import com.slackish.workspace.Role;
@@ -19,12 +21,14 @@ public class InvitationService {
     private final InvitationRepository invitations;
     private final MembershipRepository memberships;
     private final WorkspaceService workspaceService;
+    private final UserRepository users;
 
     public InvitationService(InvitationRepository invitations, MembershipRepository memberships,
-                             WorkspaceService workspaceService) {
+                             WorkspaceService workspaceService, UserRepository users) {
         this.invitations = invitations;
         this.memberships = memberships;
         this.workspaceService = workspaceService;
+        this.users = users;
     }
 
     public Invitation invite(Long workspaceId, Long inviterId, String email, Role role) {
@@ -62,12 +66,27 @@ public class InvitationService {
     public Membership accept(String token, Long userId) {
         Invitation inv = invitations.findByToken(token)
                 .orElseThrow(() -> Errors.badRequest("Invalid invitation token"));
+        if (inv.getStatus() != InvitationStatus.PENDING) {
+            throw Errors.badRequest("Invitation is no longer valid");
+        }
+        if (inv.getExpiresAt() == null || !inv.getExpiresAt().isAfter(Instant.now())) {
+            throw Errors.badRequest("Invitation has expired");
+        }
+        User user = users.findById(userId)
+                .orElseThrow(() -> Errors.unauthorized("Authentication required"));
+        if (user.getEmail() == null || inv.getEmail() == null
+                || !user.getEmail().trim().equalsIgnoreCase(inv.getEmail().trim())) {
+            throw Errors.forbidden("This invitation was issued to a different email address");
+        }
         Membership m = memberships.findByWorkspaceIdAndUserId(inv.getWorkspaceId(), userId)
                 .orElseGet(Membership::new);
         m.setWorkspaceId(inv.getWorkspaceId());
         m.setUserId(userId);
         m.setRole(inv.getRole());
         m.setActive(true);
-        return memberships.save(m);
+        Membership saved = memberships.save(m);
+        inv.setStatus(InvitationStatus.ACCEPTED);
+        invitations.save(inv);
+        return saved;
     }
 }
